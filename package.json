@@ -1,0 +1,28 @@
+{
+  "name": "botkit-ryver-connector",
+  "version": "1.0.0",
+  "description": "Botkit connector for Ryver",
+  "main": "ryver_bot.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RyverApp/botkit-ryver-connector.git"
+  },
+  "keywords": [
+    "Botkit",
+    "Ryver",
+    "bots",
+    "chatbots"
+  ],
+  "author": "Luke Baulch (https://ryver.com)",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/RyverApp/botkit-ryver-connector/issues"
+  },
+  "homepage": "https://github.com/RyverApp/botkit-ryver-connector#readme",
+  "dependencies": {
+    "request": "^2.88.0"
+  }
+}
