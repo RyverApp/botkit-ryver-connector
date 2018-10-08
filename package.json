@@ -2,7 +2,7 @@
   "name": "botkit-ryver-connector",
   "version": "1.0.0",
   "description": "Botkit connector for Ryver",
-  "main": "ryver_bot.js",
+  "main": "./lib/ryver_bot.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -11,8 +11,8 @@
     "url": "git+https://github.com/RyverApp/botkit-ryver-connector.git"
   },
   "keywords": [
-    "Botkit",
-    "Ryver",
+    "botkit",
+    "ryver",
     "bots",
     "chatbots"
   ],
