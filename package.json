@@ -1,6 +1,6 @@
 {
   "name": "botkit-ryver-connector",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "Botkit connector for Ryver",
   "main": "./lib/ryver_bot.js",
   "scripts": {
