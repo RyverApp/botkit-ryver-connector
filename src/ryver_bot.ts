@@ -1,34 +1,90 @@
-"use strict";
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-var crypto = require("crypto");
-var ryverApi = __importStar(require("./ryver_web_api.js"));
-var utils = __importStar(require("./utils.js"));
-function ryverBot(Botkit, config) {
-    var controller = Botkit.core(config);
-    var ctrl = controller;
+import crypto = require('crypto');
+import * as ryverApi from './ryver_web_api.js';
+import * as utils from './utils.js';
+import * as bk from 'botkit';
+import express from 'express';
+
+export interface RyverBotkitConfiguration {
+    api_root?: string;
+    bot_token?: string;
+}
+
+export interface RyverBotkitController extends bk.Controller<RyverBotkitConfiguration, RyverMessage, RyverBot> {
+    api: ryverApi.RyverWebApi;
+    identity: RyverBotIdentity;
+
+    createWebhookEndpoint(expressWebserver: express.Application, path: string): void;
+    handleWebhookPayload(req: botkitExpressRequest, res: express.Response): void;
+}
+
+interface botkitExpressRequest extends express.Request { rawBody: string } // property added by botkit.setupWebserver()
+
+export interface RyverBotIdentity extends bk.Identity {
+    id: number;
+}
+
+export interface RyverBot extends bk.Bot<RyverBotkitConfiguration, RyverMessage> {
+    //api: ryverApi.RyverWebApi;
+    type: string;
+    botkit: any;
+    config: RyverBotkitConfiguration;
+    res: express.Response;
+    identity: RyverBotIdentity;
+
+    replyImmediate: (src: RyverIncomingMessage, resp: string | RyverOutgoingMessage, cb?: (err?: Error, res?: any) => void) => void;
+
+    sendDirectChatMessage: (message: string, userId: number, ephemeral: boolean, cb?: ryverApi.ApiCallback) => void;
+    sendForumChatMessage: (message: string, forumId: number, ephemeralUserId: number | null, cb?: ryverApi.ApiCallback) => void;
+    sendWorkroomChatMessage: (message: string, workroomId: number, ephemeralUserId: number | null, cb?: ryverApi.ApiCallback) => void;
+    sendPostComment: (message: string, postId: number, cb?: ryverApi.ApiCallback) => void;
+    sendTaskComment: (message: string, taskId: number, cb?: ryverApi.ApiCallback) => void;
+}
+
+export interface RyverMessage extends bk.Message {
+}
+
+export interface RyverIncomingMessage extends RyverMessage {
+    type: string;
+    user: string;
+    channel: string;
+    text: string;
+}
+
+export interface RyverOutgoingMessage extends RyverMessage {
+    text: string;
+    user: string;
+    channel: string;
+    ephemeral?: boolean;
+}
+
+export interface RyverPlatformMessage {
+    text: string;
+    channel: string;
+    ephemeralUserId: number|null;
+}
+
+export function ryverBot(Botkit: any, config: RyverBotkitConfiguration): RyverBotkitController {
+    const controller = Botkit.core(config);
+    const ctrl: RyverBotkitController = controller;
     ctrl.api = new ryverApi.RyverWebApi(config.api_root || '', config.bot_token || '', controller.log);
-    controller.defineBot(function (botkit, config) {
-        var bot = {
+
+    controller.defineBot((botkit: any, config: RyverBotkitConfiguration) => {
+        var bot: RyverBot = {
             type: 'ryver',
             botkit: botkit,
             config: config || {},
             utterances: botkit.utterances,
-        };
-        function handleApiCallback(cb) {
-            return function (err) {
-                cb && cb(err, null);
+        } as any;
+
+        function handleApiCallback(cb?: (err: Error, res?: any) => void): ryverApi.ApiCallback {
+            return (err: Error | null) => {
+                cb && cb(err!, null);
             };
         }
+
         // here is where you make the API call to SEND a message
         // the message object should be in the proper format already
-        bot.send = function (message, cb) {
+        bot.send = (message: RyverPlatformMessage, cb?) => {
             var c = utils.splitChannel(message.channel);
             if (c) {
                 switch (c.prefix) {
@@ -49,54 +105,63 @@ function ryverBot(Botkit, config) {
                         return;
                 }
             }
+
             botkit.log.info('Sending message not handled. Invalid channel format');
             cb && cb(new Error('Sending message not handled. Invalid channel format'));
-        };
+        }
+
         // this function takes an incoming message (from a user/convo) and an outgoing message (reply from bot)
         // and ensures that the reply has the appropriate fields to appear as a reply
-        bot.reply = function (src, resp, cb) {
-            var msg = constructSendMessage(src, resp);
+        bot.reply = (src: RyverIncomingMessage, resp: string | RyverOutgoingMessage, cb) => {
+            let msg = constructSendMessage(src, resp);
             bot.say(msg, cb);
-        };
+        }
+
         // similar to reply() but this will send an immediate response for commands
-        bot.replyImmediate = function (src, resp, cb) {
+        bot.replyImmediate = (src: RyverIncomingMessage, resp: string | RyverOutgoingMessage, cb?) => {
             if (!bot.res) {
-                var errMsg = 'There is no response object for this message';
+                let errMsg = 'There is no response object for this message';
                 controller.log.error(errMsg);
-                cb && cb(new Error(errMsg));
+                cb && cb(new Error(errMsg))
                 return;
             }
+
             if (!resp) {
                 bot.res.end();
                 cb && cb();
                 return;
             }
-            var msg = constructSendMessage(src, resp);
-            botkit.middleware.send.run(bot, msg, function (err, bot, msg) {
+
+            let msg = constructSendMessage(src, resp);
+            botkit.middleware.send.run(bot, msg, (err: Error, bot: RyverBot, msg: RyverOutgoingMessage) => {
                 if (!err) {
                     bot.res.json(msg);
                 }
                 cb && cb(err);
             });
-        };
-        function constructSendMessage(src, resp) {
+        }
+
+        function constructSendMessage(src: RyverIncomingMessage, resp: string | RyverOutgoingMessage): RyverOutgoingMessage {
             if (typeof (resp) === 'string') {
                 return {
                     text: resp,
-                    channel: src.channel,
-                    user: src.user,
-                };
+                    channel: src.channel!,
+                    user: src.user!,
+                }
             }
-            resp.channel = src.channel;
-            resp.user = src.user;
+            (resp as RyverOutgoingMessage).channel = src.channel;
+            (resp as RyverOutgoingMessage).user = src.user;
+
             return resp;
         }
+
         // this function defines the mechanism by which botkit looks for ongoing conversations
         // probably leave as is!
-        bot.findConversation = function (message, cb) {
+        bot.findConversation = (message: RyverIncomingMessage, cb) => {
             for (var t = 0; t < botkit.tasks.length; t++) {
                 for (var c = 0; c < botkit.tasks[t].convos.length; c++) {
-                    if (botkit.tasks[t].convos[c].isActive() &&
+                    if (
+                        botkit.tasks[t].convos[c].isActive() &&
                         botkit.tasks[t].convos[c].source_message.user == message.user &&
                         message.channel && botkit.tasks[t].convos[c].source_message.channel == message.channel &&
                         botkit.excludedEvents.indexOf(message.type) == -1 // this type of message should not be included
@@ -108,25 +173,32 @@ function ryverBot(Botkit, config) {
             }
             cb();
         };
-        bot.sendDirectChatMessage = function (message, userId, ephemeral, cb) {
+
+        bot.sendDirectChatMessage = (message, userId, ephemeral, cb?) => {
             ctrl.api.postDirectChatMessage(message, userId, ephemeral, cb);
-        };
-        bot.sendForumChatMessage = function (message, forumId, ephemeralUserId, cb) {
+        }
+
+        bot.sendForumChatMessage = (message, forumId, ephemeralUserId, cb?) => {
             ctrl.api.postForumChatMessage(message, forumId, ephemeralUserId, cb);
-        };
-        bot.sendWorkroomChatMessage = function (message, workroomId, ephemeralUserId, cb) {
+        }
+
+        bot.sendWorkroomChatMessage = (message, workroomId, ephemeralUserId, cb?) => {
             ctrl.api.postWorkroomChatMessage(message, workroomId, ephemeralUserId, cb);
-        };
-        bot.sendPostComment = function (message, postId, cb) {
+        }
+
+        bot.sendPostComment = (message, postId, cb?) => {
             ctrl.api.postPostComment(message, postId, cb);
-        };
-        bot.sendTaskComment = function (message, taskId, cb) {
+        }
+
+        bot.sendTaskComment = (message, taskId, cb?) => {
             ctrl.api.postTaskComment(message, taskId, cb);
-        };
+        }
+
         return bot;
     });
+
     function initialize() {
-        ctrl.api.getCurrentUser(function (err, data) {
+        ctrl.api.getCurrentUser((err, data) => {
             if (err) {
                 controller.log.error('Error fetching Ryver bot identity from API: ' + err);
                 return;
@@ -141,55 +213,67 @@ function ryverBot(Botkit, config) {
                 emails: [data.d.emailAddress]
             };
             controller.debug('Identity received: [' + ctrl.identity.id + '] @' + ctrl.identity.name);
+
             controller.startTicking();
         });
     }
-    ctrl.createWebhookEndpoint = function (webServer, path) {
+
+    ctrl.createWebhookEndpoint = (webServer, path) => {
         controller.debug('Configured ryver end-point \'' + path + '\' for receiving webhook events');
-        webServer.post(path, function (req, res) {
+        webServer.post(path, (req: any, res: any) => {
             res.status(200);
+
             // Pass the webhook into be processed
             ctrl.handleWebhookPayload(req, res);
         });
     };
-    ctrl.handleWebhookPayload = function (req, res) {
+
+    ctrl.handleWebhookPayload = (req, res) => {
         if (!validateSignature(req)) {
             res.status(401).send('Signature validation failed');
             return;
         }
-        ctrl.spawn({}, function (bot) {
+
+        ctrl.spawn({}, (bot: RyverBot) => {
             controller.ingest(bot, req.body, res);
         });
     };
-    function validateSignature(req) {
+
+    function validateSignature(req: botkitExpressRequest) {
         if (controller.config.app_secret) {
             if (!req.rawBody) {
                 controller.log.info('The request object did not have a \'rawBody\' property required to validate the signature');
                 return false;
             }
-            var signature = req.header('x-ryv-signature');
+
+            let signature = req.header('x-ryv-signature');
             if (!signature) {
                 controller.log.info('Received request without the required \'x-ryv-signature\' header');
                 return false;
             }
-            var timestamp = req.header('x-ryv-timestamp');
+
+            let timestamp = req.header('x-ryv-timestamp');
             if (!timestamp) {
                 controller.log.info('Received request without the required \'x-ryv-timestamp\' header');
                 return false;
             }
-            var ts = Date.parse(timestamp);
+
+            let ts = Date.parse(timestamp);
             if (isNaN(ts)) {
                 controller.log.info('Received request with an invalid \'x-ryv-timestamp\' header value of \'' + timestamp + '\'');
                 return false;
             }
+
             // 5 minute timestamp tolerance to cater for server time differences
             if (Math.abs(ts - Date.now()) > 5 * 60 * 1000) {
                 controller.log.info('Received request with a \'x-ryv-timestamp\' header outside valid range. Value: \'' + timestamp + '\'');
                 return false;
             }
-            var hash = crypto.createHmac('sha256', controller.config.app_secret)
+
+            let hash = crypto.createHmac('sha256', controller.config.app_secret)
                 .update(timestamp + ':' + req.rawBody)
                 .digest('base64');
+
             if (hash !== signature) {
                 controller.log.info('Received request with an incorrect signature');
                 return false;
@@ -197,8 +281,9 @@ function ryverBot(Botkit, config) {
         }
         return true;
     }
+
     // setBotIdentity
-    controller.middleware.spawn.use(function (bot, next) {
+    controller.middleware.spawn.use((bot: RyverBot, next: Function) => {
         if (!ctrl.identity) {
             controller.log.error('Ryver bot identity not set');
             return;
@@ -207,20 +292,22 @@ function ryverBot(Botkit, config) {
         controller.debug('Bot identity set');
         next();
     });
+
+
     // ingestValidateWebhookSignature
-    controller.middleware.ingest.use(function (bot, message, res, next) {
+    controller.middleware.ingest.use((bot: RyverBot, message: any, res: express.Response, next: Function) => {
         if (message.command) {
             // store response object to support responses from bots for slash commands
             bot.res = res;
-        }
-        else {
+        } else {
             // immediately respond to webhooks requests
             res.send();
         }
         next();
     });
+
     // ingestIgnoreBotOriginatedMessages
-    controller.middleware.ingest.use(function (bot, message, res, next) {
+    controller.middleware.ingest.use((bot: RyverBot, message: any, res: express.Response, next: Function) => {
         if (!controller.config.allowBotOriginatedMessages) {
             var userId = message.command ? parseInt(message.userId) : message.user.id;
             if (userId === bot.identity.id) {
@@ -231,69 +318,75 @@ function ryverBot(Botkit, config) {
         }
         next();
     });
+
     // normalizeCommandType
-    controller.middleware.normalize.use(function (bot, message, next) {
+    controller.middleware.normalize.use((bot: RyverBot, message: any, next: Function) => {
         if (message.command) {
-            message.type = 'command';
+            (message as RyverIncomingMessage).type = 'command';
             controller.debug('normalize command', message.command);
         }
         next();
     });
+
     // normalizeMessageUser
-    controller.middleware.normalize.use(function (bot, message, next) {
-        var userId = null;
+    controller.middleware.normalize.use((bot: RyverBot, message: any, next: Function) => {
+        let userId: string | null = null;
         if (message.type === 'command') {
             userId = message.userId;
-        }
-        else {
+        } else {
             userId = message.user && message.user.id || null;
         }
         if (!userId) {
             controller.log.error('Could not obtain user for message');
             return;
         }
-        message.user = userId;
+
+        (message as RyverIncomingMessage).user = userId;
         controller.debug('normalize user', message.user);
         next();
     });
+
     // normalizeMessageChannel
-    controller.middleware.normalize.use(function (bot, message, next) {
-        var channel = null;
+    controller.middleware.normalize.use((bot: RyverBot, message: any, next: Function) => {
+        let channel: string | null = null;
         if (message.type === 'command') {
             channel = utils.formatChannelFromEntityType(message.channelType, parseInt(message.channelId));
-        }
-        else if (message.type.startsWith('chat_')) {
+
+        } else if (message.type.startsWith('chat_')) {
             channel = utils.formatChannelFromEntityType(message.data.channel.__metadata.type, message.data.channel.id);
-        }
-        else if (message.type.startsWith('post_')) {
+
+        } else if (message.type.startsWith('post_')) {
             channel = utils.formatChannel(utils.channelPrefix.POST, message.data.entityId || message.data.entity.id);
-        }
-        else if (message.type.startsWith('postcomment_')) {
-            var id = message.data.entity ? message.data.entity.post.id : message.data.post.id;
+
+        } else if (message.type.startsWith('postcomment_')) {
+            let id = message.data.entity ? message.data.entity.post.id : message.data.post.id;
             channel = utils.formatChannel(utils.channelPrefix.POST, id);
-        }
-        else if (message.type.startsWith('task_')) {
+
+        } else if (message.type.startsWith('task_')) {
             channel = utils.formatChannel(utils.channelPrefix.TASK, message.data.entityId || message.data.entity.id);
-        }
-        else if (message.type.startsWith('taskcomment_')) {
-            var id = message.data.entity ? message.data.entity.task.id : message.data.task.id;
+
+        } else if (message.type.startsWith('taskcomment_')) {
+            let id = message.data.entity ? message.data.entity.task.id : message.data.task.id;
             channel = utils.formatChannel(utils.channelPrefix.TASK, id);
+
         }
         if (!channel) {
             controller.log.error('Could not obtain channel for message');
             return;
         }
-        message.channel = channel;
+        (message as RyverIncomingMessage).channel = channel;
+
         controller.debug('normalize channel', message.channel);
+
         next();
     });
+
     // normalizeMessageText
-    controller.middleware.normalize.use(function (bot, message, next) {
-        var text = '';
+    controller.middleware.normalize.use((bot: RyverBot, message: any, next: Function) => {
+        var text: string = '';
         if (message.type === 'command') {
             text = (message.command + ' ' + (message.text || '')).trim();
-        }
-        else if (message.data && message.data.entity && message.data.entity.__metadata) {
+        } else if (message.data && message.data.entity && message.data.entity.__metadata) {
             switch (message.data.entity.__metadata.type) {
                 case 'Entity.ChatMessage':
                     text = message.data.entity.message;
@@ -312,40 +405,46 @@ function ryverBot(Botkit, config) {
                     break;
             }
         }
-        message.text = text;
+
+        (message as RyverIncomingMessage).text = text;
+
         controller.debug('normalize text', message.text);
+
         next();
     });
-    controller.middleware.categorize.use(function (bot, message, next) {
+
+    controller.middleware.categorize.use((bot: RyverBot, message: RyverIncomingMessage, next: Function) => {
         if (message.type === 'chat_created' || message.type === 'postcomment_created' || message.type === 'taskcomment_created') {
-            if (message.channel.charAt(0) === 'U') {
+            if (message.channel!.charAt(0) === 'U') {
                 message.type = 'direct_message';
-            }
-            else {
+            } else {
                 var username = '@' + bot.identity.name;
-                if (new RegExp('^' + username, 'i').test(message.text)) {
+                if (new RegExp('^' + username, 'i').test(message.text!)) {
                     message.type = 'direct_mention';
-                    message.text = message.text.substr(username.length + 1);
-                }
-                else if (new RegExp('(^|\W+)' + username, 'i').test(message.text)) {
+                    message.text = message.text!.substr(username.length + 1);
+                } else if (new RegExp('(^|\W+)' + username, 'i').test(message.text!)) {
                     message.type = 'mention';
-                }
-                else {
+                } else {
                     message.type = 'ambient';
                 }
             }
+
         }
+
         controller.debug('categorize type', message.type);
+
         next();
     });
+
     // formatStandardMessage
-    controller.middleware.format.use(function (bot, message, platform_message, next) {
+    controller.middleware.format.use((bot: RyverBot, message: RyverOutgoingMessage, platform_message: RyverPlatformMessage, next: Function) => {
         platform_message.text = message.text;
-        platform_message.channel = message.channel;
+        platform_message.channel = message.channel;        
         platform_message.ephemeralUserId = message.ephemeral ? parseInt(message.user) : null;
         next();
     });
+
     initialize();
+
     return controller;
 }
-exports.ryverBot = ryverBot;

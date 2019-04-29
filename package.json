@@ -1,8 +1,10 @@
 {
   "name": "botkit-ryver-connector",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Botkit connector for Ryver",
   "main": "./lib/ryver_bot.js",
+  "types": "./lib/ryver_bot.d.ts",
+  "files": ["lib/**/*"],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -23,6 +25,12 @@
   },
   "homepage": "https://github.com/RyverApp/botkit-ryver-connector#readme",
   "dependencies": {
+    "botkit": "^0.7.4",
     "request": "^2.88.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.16.1",
+    "@types/node": "^11.13.7",
+    "typescript": "^3.4.5"
   }
 }
