@@ -22,7 +22,7 @@ export class RyverWebApi {
         this._logger = logger;
     }
 
-    public getCurrentUser(cb: ApiResultCallback<ApiResourceResponse<ApiResourceUser>>) {
+    public getCurrentUser(cb: ApiResultCallback<ApiOperationResponse<ApiResourceUser>>) {
         this.get('User.GetCurrent()', cb);
     }
 
@@ -91,14 +91,13 @@ export class RyverWebApi {
 
 export type ApiCallback = (err: Error | null) => void;
 export type ApiResultCallback<T> = (err: Error | null, res?: T) => void;
-export interface ApiResourceResponse<T> {
+export interface ApiOperationResponse<T> {
     d: T;
 }
-export interface ApiCollectionResponse<T> {
-    d: ApiResponseResult<T[]>;
-}
-export interface ApiResponseResult<T> {
-    results: T;
+export interface ApiOdataResponse<T> {
+    d: {
+        results: T;
+    };
 }
 export interface ApiResourceUser {
     id: number;
