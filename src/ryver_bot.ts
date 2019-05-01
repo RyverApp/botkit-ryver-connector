@@ -4,12 +4,7 @@ import * as utils from './utils.js';
 import * as bk from 'botkit';
 import express from 'express';
 
-export interface RyverBotkitConfiguration {
-    api_root?: string;
-    bot_token?: string;
-}
-
-export interface RyverBotkitController extends bk.Controller<RyverBotkitConfiguration, RyverMessage, RyverBot> {
+export interface RyverBotkitController extends bk.Controller<RyverSpawnConfiguration, RyverMessage, RyverBot> {
     api: ryverApi.RyverWebApi;
     identity: RyverBotIdentity;
 
@@ -23,11 +18,20 @@ export interface RyverBotIdentity extends bk.Identity {
     id: number;
 }
 
-export interface RyverBot extends bk.Bot<RyverBotkitConfiguration, RyverMessage> {
-    //api: ryverApi.RyverWebApi;
-    type: string;
-    botkit: any;
-    config: RyverBotkitConfiguration;
+export interface RyverBotkitConfiguration extends bk.Configuration {
+    api_root?: string;
+    bot_token?: string;
+    app_secret?: string;
+    allowBotOriginatedMessages?: boolean;
+}
+
+export interface RyverSpawnConfiguration {
+}
+
+export interface RyverBot extends bk.Bot<RyverSpawnConfiguration, RyverMessage> {
+    readonly type: string;
+    readonly botkit: any;
+    readonly config: RyverSpawnConfiguration;
     res: express.Response;
     identity: RyverBotIdentity;
 
@@ -60,7 +64,7 @@ export interface RyverOutgoingMessage extends RyverMessage {
 export interface RyverPlatformMessage {
     text: string;
     channel: string;
-    ephemeralUserId: number|null;
+    ephemeralUserId: number | null;
 }
 
 export function ryverBot(Botkit: any, config: RyverBotkitConfiguration): RyverBotkitController {
@@ -68,19 +72,13 @@ export function ryverBot(Botkit: any, config: RyverBotkitConfiguration): RyverBo
     const ctrl: RyverBotkitController = controller;
     ctrl.api = new ryverApi.RyverWebApi(config.api_root || '', config.bot_token || '', controller.log);
 
-    controller.defineBot((botkit: any, config: RyverBotkitConfiguration) => {
+    controller.defineBot((botkit: any, config: RyverSpawnConfiguration) => {
         var bot: RyverBot = {
             type: 'ryver',
             botkit: botkit,
             config: config || {},
             utterances: botkit.utterances,
         } as any;
-
-        function handleApiCallback(cb?: (err: Error, res?: any) => void): ryverApi.ApiCallback {
-            return (err: Error | null) => {
-                cb && cb(err!, null);
-            };
-        }
 
         // here is where you make the API call to SEND a message
         // the message object should be in the proper format already
@@ -108,6 +106,12 @@ export function ryverBot(Botkit: any, config: RyverBotkitConfiguration): RyverBo
 
             botkit.log.info('Sending message not handled. Invalid channel format');
             cb && cb(new Error('Sending message not handled. Invalid channel format'));
+        }
+
+        function handleApiCallback(cb?: (err: Error, res?: any) => void): ryverApi.ApiCallback {
+            return (err: Error | null) => {
+                cb && cb(err!, null);
+            };
         }
 
         // this function takes an incoming message (from a user/convo) and an outgoing message (reply from bot)
@@ -234,6 +238,12 @@ export function ryverBot(Botkit: any, config: RyverBotkitConfiguration): RyverBo
             return;
         }
 
+        if (!ctrl.identity) {
+            controller.log.error('Ryver bot identity not set');
+            res.send();
+            return;
+        }
+
         ctrl.spawn({}, (bot: RyverBot) => {
             controller.ingest(bot, req.body, res);
         });
@@ -284,15 +294,10 @@ export function ryverBot(Botkit: any, config: RyverBotkitConfiguration): RyverBo
 
     // setBotIdentity
     controller.middleware.spawn.use((bot: RyverBot, next: Function) => {
-        if (!ctrl.identity) {
-            controller.log.error('Ryver bot identity not set');
-            return;
-        }
         bot.identity = ctrl.identity;
         controller.debug('Bot identity set');
         next();
     });
-
 
     // ingestValidateWebhookSignature
     controller.middleware.ingest.use((bot: RyverBot, message: any, res: express.Response, next: Function) => {
@@ -439,7 +444,7 @@ export function ryverBot(Botkit: any, config: RyverBotkitConfiguration): RyverBo
     // formatStandardMessage
     controller.middleware.format.use((bot: RyverBot, message: RyverOutgoingMessage, platform_message: RyverPlatformMessage, next: Function) => {
         platform_message.text = message.text;
-        platform_message.channel = message.channel;        
+        platform_message.channel = message.channel;
         platform_message.ephemeralUserId = message.ephemeral ? parseInt(message.user) : null;
         next();
     });
