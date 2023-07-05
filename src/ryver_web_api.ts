@@ -77,7 +77,7 @@ export class RyverWebApi {
 
         request(params, (error, response, body) => {
             if (error) {
-                this._logger.error('Got response', response.statusCode, error, body);
+                this._logger.error('Got response', response && response.statusCode, error, body);
                 return cb!(error);
             }
 
