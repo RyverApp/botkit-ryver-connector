@@ -12,20 +12,18 @@ export interface IChannel {
 }
 
 export function splitChannel(channel: string): IChannel | null {
-    if (typeof channel !== 'string' || channel.length < 2) {
+    if (channel.length < 2) {
         return null;
     }
 
-    let prefix = channel.charAt(0);
-    let id = parseInt(channel.substr(1));
-
+    const id = parseInt(channel.substring(1));
     if (isNaN(id)) {
         return null;
     }
 
     return {
         id: id,
-        prefix: prefix
+        prefix: channel.charAt(0)
     };
 }
 
@@ -34,7 +32,7 @@ export function formatChannel(prefix: string, id: number): string {
 }
 
 export function formatChannelFromEntityType(entityType: string, id: number): string | null {
-    var prefix: string;
+    let prefix: string;
     switch (entityType) {
         case 'Entity.Forum':
             prefix = channelPrefix.FORUM;

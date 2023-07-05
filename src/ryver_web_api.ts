@@ -1,6 +1,7 @@
 import request = require('request');
 
-function noop() { }
+function noop() {
+}
 
 export class RyverWebApi {
 
@@ -15,7 +16,7 @@ export class RyverWebApi {
             throw new Error('Required configuration is missing for web API use');
         }
 
-        apiRoot = apiRoot.substr(-1) === '/' ? apiRoot.slice(0, -1) : apiRoot;
+        apiRoot = apiRoot.substring(-1) === '/' ? apiRoot.slice(0, -1) : apiRoot;
         this.apiUrl = apiRoot + '/api/1/odata.svc/';
         this._apiToken = apiToken;
         this._userAgent = userAgent || 'botkit-ryver-connector';
@@ -27,23 +28,26 @@ export class RyverWebApi {
     }
 
     public postForumChatMessage(msg: string, teamId: number, ephemeralUserId: number | null, cb?: ApiCallback) {
-        this.post('forums(' + teamId + ')/Chat.PostMessage()', { body: msg, ephemeralUserId: ephemeralUserId }, cb);
+        this.post('forums(' + teamId + ')/Chat.PostMessage()', {body: msg, ephemeralUserId: ephemeralUserId}, cb);
     }
 
     public postWorkroomChatMessage(msg: string, teamId: number, ephemeralUserId: number | null, cb?: ApiCallback) {
-        this.post('workrooms(' + teamId + ')/Chat.PostMessage()', { body: msg, ephemeralUserId: ephemeralUserId }, cb);
+        this.post('workrooms(' + teamId + ')/Chat.PostMessage()', {body: msg, ephemeralUserId: ephemeralUserId}, cb);
     }
 
     public postDirectChatMessage(msg: string, userId: number, isEphemeral: boolean, cb?: ApiCallback) {
-        this.post('users(' + userId + ')/Chat.PostMessage()', { body: msg, ephemeralUserId: isEphemeral ? userId : null }, cb);
+        this.post('users(' + userId + ')/Chat.PostMessage()', {
+            body: msg,
+            ephemeralUserId: isEphemeral ? userId : null
+        }, cb);
     }
 
     public postPostComment(msg: string, postId: number, cb?: ApiCallback) {
-        this.post('postComments', { comment: msg, post: { id: postId } }, cb);
+        this.post('postComments', {comment: msg, post: {id: postId}}, cb);
     }
 
     public postTaskComment(msg: string, taskId: number, cb?: ApiCallback) {
-        this.post('taskComments', { comment: msg, task: { id: taskId } }, cb);
+        this.post('taskComments', {comment: msg, task: {id: taskId}}, cb);
     }
 
     public get<T>(path: string, cb?: ApiCallback | ApiResultCallback<T>) {
@@ -58,14 +62,14 @@ export class RyverWebApi {
         cb = cb || noop;
 
         this._logger.debug('** API CALL: ' + method + ' ' + path);
-        var params = {
+        const params = {
             method: method,
             url: this.apiUrl + path,
             headers: {
                 'Accept-Version': '2018.09.01',
                 'User-Agent': this._userAgent,
             },
-            auth: { 'bearer': this._apiToken },
+            auth: {'bearer': this._apiToken},
             json: true,
             body: body,
             gzip: true,
@@ -91,14 +95,17 @@ export class RyverWebApi {
 
 export type ApiCallback = (err: Error | null) => void;
 export type ApiResultCallback<T> = (err: Error | null, res?: T) => void;
+
 export interface ApiOperationResponse<T> {
     d: T;
 }
+
 export interface ApiOdataResponse<T> {
     d: {
         results: T;
     };
 }
+
 export interface ApiResourceUser {
     id: number;
     username: string,

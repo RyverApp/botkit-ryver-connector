@@ -9,10 +9,13 @@ export interface RyverBotkitController extends bk.Controller<RyverSpawnConfigura
     identity: RyverBotIdentity;
 
     createWebhookEndpoint(expressWebserver: express.Application, path: string): void;
+
     handleWebhookPayload(req: botkitExpressRequest, res: express.Response): void;
 }
 
-interface botkitExpressRequest extends express.Request { rawBody: string } // property added by botkit.setupWebserver()
+interface botkitExpressRequest extends express.Request {
+    rawBody: string
+} // property added by botkit.setupWebserver()
 
 export interface RyverBotIdentity extends bk.Identity {
     id: number;
@@ -73,7 +76,7 @@ export function ryverBot(Botkit: any, config: RyverBotkitConfiguration): RyverBo
     ctrl.api = new ryverApi.RyverWebApi(config.api_root || '', config.bot_token || '', controller.log);
 
     controller.defineBot((botkit: any, config: RyverSpawnConfiguration) => {
-        var bot: RyverBot = {
+        const bot: RyverBot = {
             type: 'ryver',
             botkit: botkit,
             config: config || {},
@@ -83,7 +86,7 @@ export function ryverBot(Botkit: any, config: RyverBotkitConfiguration): RyverBo
         // here is where you make the API call to SEND a message
         // the message object should be in the proper format already
         bot.send = (message: RyverPlatformMessage, cb?) => {
-            var c = utils.splitChannel(message.channel);
+            const c = utils.splitChannel(message.channel);
             if (c) {
                 switch (c.prefix) {
                     case utils.channelPrefix.POST:
@@ -162,8 +165,8 @@ export function ryverBot(Botkit: any, config: RyverBotkitConfiguration): RyverBo
         // this function defines the mechanism by which botkit looks for ongoing conversations
         // probably leave as is!
         bot.findConversation = (message: RyverIncomingMessage, cb) => {
-            for (var t = 0; t < botkit.tasks.length; t++) {
-                for (var c = 0; c < botkit.tasks[t].convos.length; c++) {
+            for (let t = 0; t < botkit.tasks.length; t++) {
+                for (let c = 0; c < botkit.tasks[t].convos.length; c++) {
                     if (
                         botkit.tasks[t].convos[c].isActive() &&
                         botkit.tasks[t].convos[c].source_message.user == message.user &&
@@ -314,7 +317,7 @@ export function ryverBot(Botkit: any, config: RyverBotkitConfiguration): RyverBo
     // ingestIgnoreBotOriginatedMessages
     controller.middleware.ingest.use((bot: RyverBot, message: any, res: express.Response, next: Function) => {
         if (!controller.config.allowBotOriginatedMessages) {
-            var userId = message.command ? parseInt(message.userId) : message.user.id;
+            const userId = message.command ? parseInt(message.userId) : message.user.id;
             if (userId === bot.identity.id) {
                 controller.debug('Skip bot-originated message');
                 bot.res && bot.res.end();
@@ -335,7 +338,7 @@ export function ryverBot(Botkit: any, config: RyverBotkitConfiguration): RyverBo
 
     // normalizeMessageUser
     controller.middleware.normalize.use((bot: RyverBot, message: any, next: Function) => {
-        let userId: string | null = null;
+        let userId: string | null;
         if (message.type === 'command') {
             userId = message.userId;
         } else {
@@ -388,7 +391,7 @@ export function ryverBot(Botkit: any, config: RyverBotkitConfiguration): RyverBo
 
     // normalizeMessageText
     controller.middleware.normalize.use((bot: RyverBot, message: any, next: Function) => {
-        var text: string = '';
+        let text: string = '';
         if (message.type === 'command') {
             text = (message.command + ' ' + (message.text || '')).trim();
         } else if (message.data && message.data.entity && message.data.entity.__metadata) {
@@ -423,10 +426,10 @@ export function ryverBot(Botkit: any, config: RyverBotkitConfiguration): RyverBo
             if (message.channel!.charAt(0) === 'U') {
                 message.type = 'direct_message';
             } else {
-                var username = '@' + bot.identity.name;
+                const username = '@' + bot.identity.name;
                 if (new RegExp('^' + username, 'i').test(message.text!)) {
                     message.type = 'direct_mention';
-                    message.text = message.text!.substr(username.length + 1);
+                    message.text = message.text!.substring(username.length + 1);
                 } else if (new RegExp('(^|\W+)' + username, 'i').test(message.text!)) {
                     message.type = 'mention';
                 } else {
